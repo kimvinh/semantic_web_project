@@ -1,1 +1,99 @@
+from SPARQLWrapper import SPARQLWrapper, JSON
 
+
+def query_movies():
+    endpoint = "https://dbpedia.org/sparql"
+    sparql = SPARQLWrapper(endpoint)
+
+    # Menu
+    print("Choose a query type (1, 2, 3, or 4):")
+    print("1. Title")
+    print("2. Actor")
+    print("3. Director")
+    print("4. Genre")
+
+    try:
+        choice = int(input("Enter your choice: ").strip())
+    except ValueError:
+        print("Invalid input. Please enter a number between 1 and 4.")
+        return
+
+    # Map choice to SPARQL variables and labels
+    query_type = None
+    user_input = None
+
+    if choice == 1:
+        query_type = "title"
+        user_input = input("Enter a movie title: ").strip()
+    elif choice == 2:
+        query_type = "actor"
+        user_input = input("Enter an actor's name: ").strip()
+    elif choice == 3:
+        query_type = "director"
+        user_input = input("Enter a director's name: ").strip()
+    elif choice == 4:
+        query_type = "genre"
+        user_input = input("Enter a genre: ").strip()
+    else:
+        print("Invalid choice. Please select a number between 1 and 4.")
+        return
+
+    # SPARQL query
+    query = """
+    PREFIX dbo: <http://dbpedia.org/ontology/>
+    PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+    SELECT DISTINCT ?movie ?title
+    WHERE {
+      ?movie a dbo:Film ;
+             rdfs:label ?title .
+    """
+
+    # Add filters based on query type
+    if query_type == "title":
+        query += f'FILTER (CONTAINS(LCASE(?title), LCASE("{user_input}"))) '
+    elif query_type == "actor":
+        query += """
+          ?movie dbo:starring ?actor .
+          ?actor rdfs:label ?actorName .
+        """
+        query += f'FILTER (CONTAINS(LCASE(?actorName), LCASE("{user_input}"))) '
+    elif query_type == "director":
+        query += """
+          ?movie dbo:director ?director .
+          ?director rdfs:label ?directorName .
+        """
+        query += f'FILTER (CONTAINS(LCASE(?directorName), LCASE("{user_input}"))) '
+    elif query_type == "genre":
+        query += """
+          ?movie dbo:genre ?genre .
+          ?genre rdfs:label ?genreName .
+        """
+        query += f'FILTER (CONTAINS(LCASE(?genreName), LCASE("{user_input}"))) '
+
+    query += """
+      FILTER (LANG(?title) = "en")
+    }
+    LIMIT 10
+    """
+
+    # Run the query
+    sparql.setQuery(query)
+    sparql.setReturnFormat(JSON)
+
+    try:
+        print("\nFetching results...\n")
+        results = sparql.query().convert()
+
+        # Display results
+        if not results["results"]["bindings"]:
+            print("No results found. Try refining your search.")
+        else:
+            for result in results["results"]["bindings"]:
+                print("Movie:", result["title"]["value"])
+    except Exception as e:
+        print(f"Error querying the SPARQL endpoint: {e}")
+
+
+# Run the interactive menu-driven query
+if __name__ == "__main__":
+    query_movies()
